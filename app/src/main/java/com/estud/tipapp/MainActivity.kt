@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.estud.tipapp.components.InputField
 import com.estud.tipapp.ui.theme.TipAppTheme
+import com.estud.tipapp.util.calculateTotalPerPerson
 import com.estud.tipapp.widgets.RoundIconButton
 
 @ExperimentalComposeUiApi
@@ -63,32 +64,34 @@ fun MainContent() {
         modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        val totalPerPerson = remember {
-            mutableStateOf(0.0)
-        }
 
         val totalValue = remember {
             mutableStateOf(0.0)
         }
 
-        CardHeader(totalPerPerson = totalPerPerson.value)
+        val splitPerPerson = remember {
+            mutableStateOf(1)
+        }
+
+        val percentage = remember {
+            mutableStateOf(0.0)
+        }
+
+        val totalPerPerson =
+            calculateTotalPerPerson(totalValue.value, splitPerPerson.value, percentage.value)
+
+        CardHeader(totalPerPerson = totalPerPerson)
 
         Spacer(modifier = Modifier.height(8.dp))
 
         TipCalculator(onValueChanged = {
-            try {
-                totalPerPerson.value = it.toDouble()
-                totalValue.value = it.toDouble()
-            } catch (e: NumberFormatException) {
-                Log.i("TAG_value", "number format error")
-            }
+            totalValue.value = it
         }, totalPersonChanged = { total ->
-            val newValue = totalValue.value / total
-            totalPerPerson.value = newValue
+            splitPerPerson.value = total
+            Log.i("TAG_value", "new value: $total")
         }, percentageChanged = { tipPercentage ->
-            val newValue = totalValue.value + (totalValue.value * tipPercentage)
-            Log.i("TAG_value", "new value: $newValue")
-            totalPerPerson.value = newValue
+            percentage.value = tipPercentage
+            Log.i("TAG_value", "new value: $tipPercentage")
         })
     }
 
@@ -98,7 +101,7 @@ fun MainContent() {
 @Composable
 fun TipCalculator(
     modifier: Modifier = Modifier,
-    onValueChanged: (String) -> Unit,
+    onValueChanged: (Double) -> Unit,
     totalPersonChanged: (Int) -> Unit,
     percentageChanged: (Double) -> Unit
 ) {
@@ -136,7 +139,13 @@ fun TipCalculator(
                 })
 
             if (validState) {
-                onValueChanged(billState.value.trim())
+                val currentValue = try {
+                    billState.value.trim().toDouble()
+                } catch (e: NumberFormatException) {
+                    0.0
+                }
+
+                onValueChanged(currentValue)
 
                 val sliderPercentage = remember {
                     mutableStateOf(0f)
@@ -146,7 +155,7 @@ fun TipCalculator(
                     totalPersonChanged(it)
                 }
 
-                DisplayTipAmount()
+                DisplayTipAmount(tipAmount = (sliderPercentage.value * currentValue.toDouble()))
 
                 DisplaySliderTipAndTextPercent(sliderPercentage.value) { newValue ->
                     sliderPercentage.value = newValue
@@ -161,12 +170,14 @@ fun TipCalculator(
 }
 
 @Composable
-fun DisplayTipAmount() {
+fun DisplayTipAmount(tipAmount: Double) {
     Row(
         modifier = Modifier.padding(8.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
+
+        val total = "%.2f".format(tipAmount)
 
         Text(
             text = "Gorjeta"
@@ -175,7 +186,7 @@ fun DisplayTipAmount() {
         Spacer(modifier = Modifier.width(165.dp))
 
         Text(
-            text = "R$45.00"
+            text = "R$$total"
         )
     }
 }
